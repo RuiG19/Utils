@@ -1,0 +1,13 @@
+[alias]
+
+push-review = "!f() { git push origin HEAD:refs/for/$1; }; f"
+[user]
+	email = rui.graca@mail.com
+	name = Rui Graça
+[code]
+	editor = vim
+[core]
+	editor = vim
+[grep]
+	extendRegexp = true
+	lineNumber = true
