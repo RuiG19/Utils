@@ -2,5 +2,6 @@
     "ip": "127.0.0.1",
     "server_port": 31490,
     "client_port": 31401,
-    "clients_number": 4
+    "clients_number": 2,
+    "log_level": "DEBUG"
 }

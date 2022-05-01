@@ -2,7 +2,7 @@
 
 
 
-namespace socket_example
+namespace tcp
 {
 
 //          foreground background
@@ -57,23 +57,30 @@ Logger::~Logger()
 {
     std::lock_guard<std::mutex> its_lock(mutex__);
 
+    if(level_ > maxLevel_) return;
+
     // time stamp
     auto its_time_t = std::chrono::system_clock::to_time_t(when_);
     auto its_time = std::localtime(&its_time_t);
     auto its_ms = (when_.time_since_epoch().count() / 100) % 1000000;
 
     std::string msg_color;
+    std::string msg_logLevel;
+
     switch (level_)
     {
     case LogLevel::ERROR:
         msg_color = COLOR_ERROR;
+        msg_logLevel = "[ERROR]";
         break;
     case LogLevel::WARNING:
         msg_color = COLOR_WARNING;
+        msg_logLevel = "[WARNING]";
         break;
     case LogLevel::DEBUG:
     default:
         msg_color = COLOR_DEBUG;
+        msg_logLevel = "[DEBUG]";
         break;
     }
 
@@ -85,11 +92,20 @@ Logger::~Logger()
         << std::dec << std::setw(2) << std::setfill('0') << its_time->tm_hour << ":"
         << std::dec << std::setw(2) << std::setfill('0') << its_time->tm_min << ":"
         << std::dec << std::setw(2) << std::setfill('0') << its_time->tm_sec << "."
-        << std::dec << std::setw(6) << std::setfill('0') << its_ms << " "
-        << buffer_.data_.str()
+        << std::dec << std::setw(6) << std::setfill('0') << its_ms 
+        << " " << msg_logLevel << " "
         << COLOR_RESET
+        << buffer_.data_.str()
         << std::endl;
 }
+
+LogLevel Logger::maxLevel_ = tcp::LogLevel::DEBUG;
+
+void Logger::setMaximumLogLevel(LogLevel level)
+{
+    maxLevel_ = level;
+}
+
 
 std::streambuf::int_type Logger::buffer::overflow(std::streambuf::int_type c) {
     if (c != EOF) {

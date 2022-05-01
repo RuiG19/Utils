@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(AddressTest)
+project(TcpApplication)
 
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -16,14 +16,3 @@ add_executable(${PROJECT_NAME}
     ${SRCS}
     main.cpp
 )
-
-add_executable(${PROJECT_NAME}_server
-    ${SRCS}
-    main_server.cpp
-)
-
-add_executable(${PROJECT_NAME}_client
-    ${SRCS}
-    main_client.cpp
-)
-

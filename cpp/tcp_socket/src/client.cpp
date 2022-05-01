@@ -1,18 +1,18 @@
 #include "client.hpp"
 #include "logger.hpp"
 
-namespace socket_example
+namespace tcp
 {
 
 uint16_t Client::_id_generator = 0;
 
-Client::Client(std::string ip_, uint16_t port_, std::string server_ip_, uint16_t server_port_) 
-              : id(++_id_generator), client_id("Client_" + std::to_string(id))
+Client::Client(std::string ip_, uint16_t port_, std::string server_ip_, uint16_t server_port_, std::function<void(std::unique_ptr<Payload> rxBuffer_)> handler_) 
+              : id(++_id_generator), client_id("Client_" + std::to_string(id)), handler(handler_)
 {
-    client_endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address_v4(ip_), port_);
-    server_endpoint = boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address_v4(server_ip_), server_port_);
+    client_endpoint = Endpoint(boost::asio::ip::make_address_v4(ip_), port_);
+    server_endpoint = Endpoint(boost::asio::ip::make_address_v4(server_ip_), server_port_);
     tx_buffer = {'P','I','N','G'}; 
-    rx_buffer = std::vector<char>(4090); 
+    rx_buffer = Payload(4090); 
 }
 
 Client::~Client()
@@ -26,6 +26,8 @@ Client::~Client()
     {
         server_socket->cancel();
         server_socket->close();
+
+        io.stop();
     }
     catch(const std::exception& e)
     {
@@ -49,13 +51,35 @@ std::future_status Client::status() const
     return status_future.wait_for(std::chrono::milliseconds(0));
 }
 
+void Client::send(std::unique_ptr<Payload> txBuffer_)
+{
+    std::string function_id = getFunctionId(__func__, client_id);
+
+    if(txBuffer_->size() == 0)
+    {
+        LOG_WARNING << function_id <<  " Empty Payload, will ignore!";
+        return;
+    }
+
+    LOG_DEBUG << function_id <<  " Sending Payload with " << txBuffer_->size() << " bytes to Server";
+    tx_buffer = *txBuffer_;
+    try
+    {
+        server_socket->send(boost::asio::buffer(tx_buffer));
+    }
+    catch(const std::exception& e)
+    {
+        LOG_ERROR << function_id << " " << e.what();
+    }    
+}
+
 void Client::start_up()
 {
     std::string function_id = getFunctionId(__func__, client_id);
 
     LOG_DEBUG << function_id << " Starting CLIENT thread";
 
-    server_socket = std::make_shared<boost::asio::ip::tcp::socket>(io);
+    server_socket = std::make_shared<Socket>(io);
 
     try
     {
@@ -99,24 +123,46 @@ void Client::rx_callback(const boost::system::error_code& ec, size_t bytes)
     if(ec)
     {
         LOG_WARNING << function_id <<  " Erro code: " << ec.message();
+        if(ec == boost::asio::error::eof)
+        {
+            LOG_DEBUG << function_id <<  " Server closed the connection!";
+        }
         return;
     }
 
+    LOG_DEBUG << function_id <<  " Received " << bytes << " bytes";
     if(bytes)
     {
-        LOG_DEBUG << function_id <<  " Received " << bytes << " bytes";
         std::string payload(rx_buffer.begin(), rx_buffer.end());
         LOG_DEBUG << function_id <<  " Rx Payload: " << payload;
+
+        if(handler)
+        {
+            std::unique_ptr<Payload> rxPayload = std::make_unique<Payload>(rx_buffer);
+            handler(std::move(rxPayload));
+        }
+        else
+        {
+            // if no hadnler is defined simply Pong the client (use as default impl - maybe be comment out this section later)
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            try
+            {
+                LOG_DEBUG << function_id <<  " Sending PING to Server(" << server_socket->remote_endpoint().port() << ")";
+                server_socket->send(boost::asio::buffer(tx_buffer));
+            }
+            catch(const std::exception& e)
+            {
+                LOG_ERROR << function_id << " " << e.what();
+            }            
+        }
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
     LOG_DEBUG << function_id <<  " Setting Async Rx Callback";
-    server_socket->async_receive(boost::asio::buffer(rx_buffer), [=](const boost::system::error_code& ec, size_t bytes){this->rx_callback(ec, bytes); });
-
-    LOG_DEBUG << function_id <<  " Sending PING to Server(" << server_socket->remote_endpoint().port() << ")";
-    server_socket->send(boost::asio::buffer(tx_buffer));
-    io.run();
+    server_socket->async_receive(boost::asio::buffer(rx_buffer), 
+        [=](const boost::system::error_code& ec, size_t bytes)
+        {
+            this->rx_callback(ec, bytes); 
+        });
 
 }
 

@@ -9,7 +9,7 @@
 #include <chrono>
 #include <iomanip>
 
-namespace socket_example
+namespace tcp
 {
 
 std::string getFunctionId(const std::string& function_name, const std::string& class_name = std::string());
@@ -31,6 +31,8 @@ public:
 Logger(LogLevel level);
 ~Logger();
 
+static void setMaximumLogLevel(LogLevel level);
+
 private:
     class buffer : public std::streambuf {
     public:
@@ -41,15 +43,16 @@ private:
     };
 
 LogLevel level_;
+static LogLevel maxLevel_;
 buffer buffer_;
 std::chrono::system_clock::time_point when_;
 static std::mutex mutex__;
 
 };
 
-#define LOG_DEBUG   socket_example::Logger(socket_example::LogLevel::DEBUG)
-#define LOG_WARNING socket_example::Logger(socket_example::LogLevel::WARNING)
-#define LOG_ERROR   socket_example::Logger(socket_example::LogLevel::ERROR)
+#define LOG_DEBUG   tcp::Logger(tcp::LogLevel::DEBUG)
+#define LOG_WARNING tcp::Logger(tcp::LogLevel::WARNING)
+#define LOG_ERROR   tcp::Logger(tcp::LogLevel::ERROR)
 
 
 }
